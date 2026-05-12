@@ -182,7 +182,7 @@ export function SailingDetail({ sailing, onBack }: Props) {
   const [history, setHistory] = useState<Record<string, PriceHistoryPoint[]>>({});
 
   const spec = SHIP_SPECS[sailing.shipCode] ?? DEFAULT_SPEC;
-  const cruiseUrl = `https://www.celebritycruises.com/cruise-search?ships=${encodeURIComponent(sailing.shipName.replace('Celebrity ', '').toLowerCase())}`;
+  const cruiseUrl = `https://www.celebritycruises.com/cruise-detail?voyageCode=${encodeURIComponent(sailing.id)}`;
 
   useEffect(() => {
     fetchPriceHistory(sailing.id).then(setHistory).catch(console.error);
