@@ -38,7 +38,7 @@ function SkeletonCard() {
 }
 
 export function BrowseView({ filters, viewMode, onResetFilters, onSelectSailing }: Props) {
-  const { sailings, total, loading, error } = useSailings(filters);
+  const { sailings, loading, error } = useSailings(filters);
 
   if (error) {
     return (

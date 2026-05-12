@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { CabinCategory, Filters, NightsPreset, Ship, SortBy } from '../types';
 
 interface Props {
