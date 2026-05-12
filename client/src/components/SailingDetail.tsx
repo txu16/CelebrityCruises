@@ -183,22 +183,11 @@ export function SailingDetail({ sailing, onBack }: Props) {
 
   const spec = SHIP_SPECS[sailing.shipCode] ?? DEFAULT_SPEC;
 
-  const CABIN_URL_CODE: Record<string, string> = {
-    interior: 'INTERIOR', oceanview: 'OCEAN_VIEW', balcony: 'BALCONY', suite: 'SUITE',
-  };
-  const cruiseParams = new URLSearchParams({
-    sailDate: sailing.departureDate,
-    shipCode: sailing.shipCode,
-    packageCode: sailing.id.replace(/_\d{4}-\d{2}-\d{2}$/, ''),
-    selectedCurrencyCode: 'USD',
-    country: 'USA',
-    roomIndex: '0',
-    r0a: '2', r0c: '0',
-    r0b: 'n', r0r: 'n', r0s: 'n', r0q: 'n', r0t: 'n',
-    r0d: CABIN_URL_CODE[cabin] ?? 'INTERIOR',
-    r0D: 'y',
-  });
-  const cruiseUrl = `https://www.celebritycruises.com/room-selection/rooms-and-guests?${cruiseParams}`;
+  const slugify = (s: string) =>
+    s.toLowerCase().replace(/[&,]+/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  const packageCode = sailing.id.replace(/_\d{4}-\d{2}-\d{2}$/, '');
+  const shipSlug = slugify(sailing.shipName.replace(/^Celebrity\s+/i, ''));
+  const cruiseUrl = `https://www.celebritycruises.com/itinerary/${sailing.nights}-night-${slugify(sailing.destination)}-from-${slugify(sailing.embarkationPort)}-on-${shipSlug}-${packageCode}`;
 
   useEffect(() => {
     fetchPriceHistory(sailing.id).then(setHistory).catch(console.error);
