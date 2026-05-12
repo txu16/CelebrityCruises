@@ -48,6 +48,10 @@ const CRUISE_SEARCH_QUERY = `
               ship { name code }
               departurePort { name code }
               destination { name }
+              days {
+                type
+                ports { port { name code } }
+              }
             }
             stateroomClassPricing {
               stateroomClass { name }
@@ -150,6 +154,7 @@ interface GqlSailing {
     ship: { name: string; code: string };
     departurePort: { name: string; code: string };
     destination: { name: string };
+    days: { type: string; ports: { port: { name: string; code: string } }[] }[] | null;
   };
   stateroomClassPricing: {
     stateroomClass: { name: string };
@@ -170,7 +175,11 @@ function mapSailing(s: GqlSailing): { voyage: CelebVoyage; prices: CelebPrices }
     nights:          it.sailingNights,
     destination:     it.destination?.name ?? '',
     embarkationPort: it.departurePort?.name ?? '',
-    ports:           [],
+    ports:           (it.days ?? [])
+                       .flatMap((d) => d.ports ?? [])
+                       .map((pv) => pv.port?.name)
+                       .filter((n): n is string => !!n)
+                       .filter((name, i, arr) => arr.indexOf(name) === i),
   };
 
   const cabins: CabinPrice[] = [];
