@@ -182,7 +182,23 @@ export function SailingDetail({ sailing, onBack }: Props) {
   const [history, setHistory] = useState<Record<string, PriceHistoryPoint[]>>({});
 
   const spec = SHIP_SPECS[sailing.shipCode] ?? DEFAULT_SPEC;
-  const cruiseUrl = `https://www.celebritycruises.com/cruise-detail?voyageCode=${encodeURIComponent(sailing.id)}`;
+
+  const CABIN_URL_CODE: Record<string, string> = {
+    interior: 'INTERIOR', oceanview: 'OCEAN_VIEW', balcony: 'BALCONY', suite: 'SUITE',
+  };
+  const cruiseParams = new URLSearchParams({
+    sailDate: sailing.departureDate,
+    shipCode: sailing.shipCode,
+    packageCode: sailing.id,
+    selectedCurrencyCode: 'USD',
+    country: 'USA',
+    roomIndex: '0',
+    r0a: '2', r0c: '0',
+    r0b: 'n', r0r: 'n', r0s: 'n', r0q: 'n', r0t: 'n',
+    r0d: CABIN_URL_CODE[cabin] ?? 'INTERIOR',
+    r0D: 'y',
+  });
+  const cruiseUrl = `https://www.celebritycruises.com/room-selection/rooms-and-guests?${cruiseParams}`;
 
   useEffect(() => {
     fetchPriceHistory(sailing.id).then(setHistory).catch(console.error);
