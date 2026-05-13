@@ -253,22 +253,37 @@ export function SailingDetail({ sailing, onBack }: Props) {
         </div>
       </section>
 
-      {sailing.itineraryPorts.length > 0 && (
-        <section className="cc-d-section">
-          <div className="cc-d-section-head">
-            <h2 className="cc-d-section-title">Itinerary</h2>
-            <div className="cc-d-section-fine">{sailing.itineraryPorts.length} ports of call</div>
+      <section className="cc-d-section">
+        <div className="cc-d-section-head">
+          <h2 className="cc-d-section-title">Itinerary</h2>
+          <div className="cc-d-section-fine">
+            {sailing.itineraryPorts.length > 0
+              ? `${sailing.itineraryPorts.length} ports of call`
+              : sailing.destination}
           </div>
-          <div className="cc-d-itin-ports">
-            {sailing.itineraryPorts.map((port, i) => (
-              <div key={i} className="cc-d-itin-port-chip">
-                {i === 0 && <span className="cc-d-itin-embark">Departs</span>}
-                {port}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+        </div>
+        <div className="cc-d-itin-ports">
+          {sailing.itineraryPorts.length > 0
+            ? sailing.itineraryPorts.map((port, i) => (
+                <div key={i} className="cc-d-itin-port-chip">
+                  {i === 0 && <span className="cc-d-itin-embark">Departs</span>}
+                  {port}
+                </div>
+              ))
+            : (
+                <>
+                  <div className="cc-d-itin-port-chip">
+                    <span className="cc-d-itin-embark">Departs</span>
+                    {sailing.embarkationPort}
+                  </div>
+                  <div className="cc-d-itin-port-chip" style={{ opacity: 0.5, fontStyle: 'italic' }}>
+                    Detailed itinerary not available
+                  </div>
+                </>
+              )
+          }
+        </div>
+      </section>
 
       <section className="cc-d-section">
         <div className="cc-d-section-head">
