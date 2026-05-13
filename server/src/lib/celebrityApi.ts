@@ -176,6 +176,7 @@ function mapSailing(s: GqlSailing): { voyage: CelebVoyage; prices: CelebPrices }
     destination:     it.destination?.name ?? '',
     embarkationPort: it.departurePort?.name ?? '',
     ports:           (it.days ?? [])
+                       .filter((d) => d.type === 'PORT')
                        .flatMap((d) => d.ports ?? [])
                        .map((pv) => pv.port?.name)
                        .filter((n): n is string => !!n)
