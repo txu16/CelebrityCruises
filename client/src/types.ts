@@ -39,7 +39,7 @@ export interface Ship {
   name: string;
 }
 
-export type NightsPreset = 'any' | '3-5' | '7' | '10-14' | '15+';
+export type NightsPreset = '3-5' | '7' | '10-14' | '15+';
 export type SortBy = 'date' | 'price';
 export type ActiveTab = 'browse' | 'lowest-ever';
 
@@ -49,10 +49,10 @@ export interface PriceHistoryPoint {
 }
 
 export interface Filters {
-  month: string;           // 'YYYY-MM' or '' for any
+  months: string[];              // [] = any month; each entry is 'YYYY-MM'
   cabinCategories: CabinCategory[];
   suiteSubcategories: string[];  // subcategory codes
-  nightsPreset: NightsPreset;
-  shipCode: string;        // '' for any
+  nightsPresets: NightsPreset[]; // [] = any length
+  shipCodes: string[];           // [] = any ship
   sortBy: SortBy;
 }

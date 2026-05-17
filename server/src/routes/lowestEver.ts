@@ -6,28 +6,47 @@ const router = Router();
 const ALL_CATS = ['interior', 'oceanview', 'balcony', 'suite'] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyBaseFilters(q: any, { month, nightsMin, nightsMax, shipCode, today }: {
-  month?: string; nightsMin?: string; nightsMax?: string; shipCode?: string; today: string;
+function applyBaseFilters(q: any, { months, nightsPresets, shipCodes, today }: {
+  months?: string[]; nightsPresets?: string[]; shipCodes?: string[]; today: string;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }): any {
   q = q.gte('departure_date', today);
-  if (month) {
-    const [year, mon] = month.split('-').map(Number);
-    if (year && mon) {
-      const start = `${year}-${String(mon).padStart(2, '0')}-01`;
-      const end = new Date(year, mon, 1).toISOString().split('T')[0];
-      q = q.gte('departure_date', start).lt('departure_date', end);
-    }
+
+  if (months && months.length > 0) {
+    const ranges = months
+      .map((m) => {
+        const [year, mon] = m.split('-').map(Number);
+        if (!year || !mon) return null;
+        const start = `${year}-${String(mon).padStart(2, '0')}-01`;
+        const end = new Date(year, mon, 1).toISOString().split('T')[0];
+        return `and(departure_date.gte.${start},departure_date.lt.${end})`;
+      })
+      .filter(Boolean) as string[];
+    if (ranges.length > 0) q = q.or(ranges.join(','));
   }
-  if (nightsMin) q = q.gte('nights', Number(nightsMin));
-  if (nightsMax) q = q.lte('nights', Number(nightsMax));
-  if (shipCode)  q = q.eq('ship_code', shipCode);
+
+  if (nightsPresets && nightsPresets.length > 0) {
+    const rangeFilters = nightsPresets.map((preset) => {
+      switch (preset) {
+        case '3-5':   return 'and(nights.gte.3,nights.lte.5)';
+        case '7':     return 'nights.eq.7';
+        case '10-14': return 'and(nights.gte.10,nights.lte.14)';
+        case '15+':   return 'nights.gte.15';
+        default:      return null;
+      }
+    }).filter(Boolean) as string[];
+    if (rangeFilters.length > 0) q = q.or(rangeFilters.join(','));
+  }
+
+  if (shipCodes && shipCodes.length > 0) q = q.in('ship_code', shipCodes);
+
   return q;
 }
 
 router.get('/', async (req: Request, res: Response) => {
   const {
-    month, cabinCategory, nightsMin, nightsMax, shipCode, sortBy,
+    months: monthsParam, cabinCategory, nightsPresets: nightsPresetsParam,
+    shipCodes: shipCodesParam, sortBy,
     limit = '50', offset = '0',
   } = req.query as Record<string, string>;
 
@@ -41,7 +60,10 @@ router.get('/', async (req: Request, res: Response) => {
     const selectedCats = cabinCategory.split(',').map((c) => c.trim()).filter(Boolean);
     const parsedLimit = Math.min(Number(limit) || 50, 200);
     const parsedOffset = Number(offset) || 0;
-    const filterArgs = { month, nightsMin, nightsMax, shipCode, today };
+    const months = monthsParam ? monthsParam.split(',').map((m) => m.trim()).filter(Boolean) : [];
+    const nightsPresets = nightsPresetsParam ? nightsPresetsParam.split(',').map((n) => n.trim()).filter(Boolean) : [];
+    const shipCodes = shipCodesParam ? shipCodesParam.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const filterArgs = { months, nightsPresets, shipCodes, today };
 
     // Step 1: fetch a batch of future sailings matching non-cabin filters
     const { data: sailingRows, error: sailErr } = await applyBaseFilters(

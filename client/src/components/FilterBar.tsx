@@ -12,14 +12,15 @@ interface Props {
   resultCount: number;
 }
 
-function getMonthOptions(): { value: string; label: string }[] {
-  const options: { value: string; label: string }[] = [{ value: '', label: 'Any month' }];
+function getMonthOptions(): { value: string; label: string; short: string }[] {
+  const options: { value: string; label: string; short: string }[] = [];
   const now = new Date();
   for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    options.push({ value, label });
+    const short = d.toLocaleDateString('en-US', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2);
+    options.push({ value, label, short });
   }
   return options;
 }
@@ -34,18 +35,23 @@ const CABIN_OPTIONS: { key: CabinCategory; label: string }[] = [
 ];
 
 const NIGHTS_OPTIONS: { value: NightsPreset; label: string }[] = [
-  { value: 'any', label: 'Any length' },
   { value: '3-5', label: '3–5 nights' },
   { value: '7', label: '7 nights' },
   { value: '10-14', label: '10–14 nights' },
   { value: '15+', label: '15+ nights' },
 ];
 
+function shipShortName(name: string) {
+  return name.replace(/^Celebrity\s+/i, '');
+}
+
 function summarizeFilters(filters: Filters, ships: Ship[]): string {
   const parts: string[] = [];
-  if (filters.month) {
-    const m = MONTH_OPTIONS.find((o) => o.value === filters.month);
+  if (filters.months.length === 1) {
+    const m = MONTH_OPTIONS.find((o) => o.value === filters.months[0]);
     if (m) parts.push(m.label);
+  } else if (filters.months.length > 1) {
+    parts.push(`${filters.months.length} months`);
   }
   if (filters.cabinCategories.length) {
     parts.push(filters.cabinCategories.map((c) => c[0].toUpperCase() + c.slice(1)).join(' + '));
@@ -53,45 +59,46 @@ function summarizeFilters(filters: Filters, ships: Ship[]): string {
   if (filters.suiteSubcategories.length) {
     parts.push(filters.suiteSubcategories.join(', '));
   }
-  if (filters.nightsPreset !== 'any') {
-    const l = NIGHTS_OPTIONS.find((o) => o.value === filters.nightsPreset);
+  if (filters.nightsPresets.length === 1) {
+    const l = NIGHTS_OPTIONS.find((o) => o.value === filters.nightsPresets[0]);
     if (l) parts.push(l.label);
+  } else if (filters.nightsPresets.length > 1) {
+    parts.push(`${filters.nightsPresets.length} lengths`);
   }
-  if (filters.shipCode) {
-    const s = ships.find((s) => s.code === filters.shipCode);
-    if (s) parts.push(s.name.replace('Celebrity ', ''));
+  if (filters.shipCodes.length === 1) {
+    const s = ships.find((s) => s.code === filters.shipCodes[0]);
+    if (s) parts.push(shipShortName(s.name));
+  } else if (filters.shipCodes.length > 1) {
+    parts.push(`${filters.shipCodes.length} ships`);
   }
   return parts.length ? parts.join(' · ') : 'All sailings · sorted by departure';
-}
-
-function SelectField({ label, value, onChange, options, grow }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  grow?: boolean;
-}) {
-  return (
-    <div className={`cc-field${grow ? ' cc-field-grow' : ''}`}>
-      <div className="cc-field-label">{label}</div>
-      <div className="cc-select-wrap">
-        <select className="cc-select" value={value} onChange={(e) => onChange(e.target.value)}>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <svg className="cc-select-caret" width="10" height="6" viewBox="0 0 10 6">
-          <path d="M1 1l4 4 4-4" stroke="currentColor" fill="none" strokeWidth="1.4" />
-        </svg>
-      </div>
-    </div>
-  );
 }
 
 export function FilterBar({
   filters, ships, suiteSubcategoryOptions, onChange,
   collapsed, onToggleCollapsed, viewMode, onViewModeChange, resultCount,
 }: Props) {
+  function toggleMonth(val: string) {
+    const next = filters.months.includes(val)
+      ? filters.months.filter((m) => m !== val)
+      : [...filters.months, val];
+    onChange({ ...filters, months: next });
+  }
+
+  function toggleNights(val: NightsPreset) {
+    const next = filters.nightsPresets.includes(val)
+      ? filters.nightsPresets.filter((n) => n !== val)
+      : [...filters.nightsPresets, val];
+    onChange({ ...filters, nightsPresets: next });
+  }
+
+  function toggleShip(code: string) {
+    const next = filters.shipCodes.includes(code)
+      ? filters.shipCodes.filter((c) => c !== code)
+      : [...filters.shipCodes, code];
+    onChange({ ...filters, shipCodes: next });
+  }
+
   function toggleCabin(cat: CabinCategory) {
     const next = filters.cabinCategories.includes(cat)
       ? filters.cabinCategories.filter((c) => c !== cat)
@@ -161,14 +168,33 @@ export function FilterBar({
           </button>
         </div>
 
-        <div className="cc-filter-row">
-          <SelectField
-            label="Month"
-            value={filters.month}
-            onChange={(v) => onChange({ ...filters, month: v })}
-            options={MONTH_OPTIONS}
-          />
+        {/* Row 1: Month */}
+        <div className="cc-filter-section">
+          <div className="cc-filter-section-label">
+            Month
+            {filters.months.length > 0 && (
+              <button className="cc-filter-clear-inline" onClick={() => onChange({ ...filters, months: [] })}>
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="cc-chip-scroll">
+            {MONTH_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                className={`cc-chip cc-chip-sm${filters.months.includes(o.value) ? ' is-on' : ''}`}
+                onClick={() => toggleMonth(o.value)}
+                type="button"
+                title={o.label}
+              >
+                {o.short}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        {/* Row 2: Cabin + Nights + Sort */}
+        <div className="cc-filter-row">
           <div className="cc-field cc-field-grow">
             <div className="cc-field-label">Cabin Category</div>
             <div className="cc-chip-row">
@@ -186,22 +212,28 @@ export function FilterBar({
             </div>
           </div>
 
-          <SelectField
-            label="Cruise Length"
-            value={filters.nightsPreset}
-            onChange={(v) => onChange({ ...filters, nightsPreset: v as NightsPreset })}
-            options={NIGHTS_OPTIONS}
-          />
-
-          <SelectField
-            label="Ship"
-            value={filters.shipCode}
-            onChange={(v) => onChange({ ...filters, shipCode: v })}
-            options={[
-              { value: '', label: 'Any ship' },
-              ...ships.map((s) => ({ value: s.code, label: s.name })),
-            ]}
-          />
+          <div className="cc-field">
+            <div className="cc-field-label">
+              Cruise Length
+              {filters.nightsPresets.length > 0 && (
+                <button className="cc-filter-clear-inline" onClick={() => onChange({ ...filters, nightsPresets: [] })}>
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="cc-chip-row">
+              {NIGHTS_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  className={`cc-chip${filters.nightsPresets.includes(o.value) ? ' is-on' : ''}`}
+                  onClick={() => toggleNights(o.value)}
+                  type="button"
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="cc-field">
             <div className="cc-field-label">Sort</div>
@@ -221,6 +253,32 @@ export function FilterBar({
             </div>
           </div>
         </div>
+
+        {/* Row 3: Ship */}
+        {ships.length > 0 && (
+          <div className="cc-filter-section">
+            <div className="cc-filter-section-label">
+              Ship
+              {filters.shipCodes.length > 0 && (
+                <button className="cc-filter-clear-inline" onClick={() => onChange({ ...filters, shipCodes: [] })}>
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="cc-chip-scroll">
+              {ships.map((s) => (
+                <button
+                  key={s.code}
+                  className={`cc-chip cc-chip-sm${filters.shipCodes.includes(s.code) ? ' is-on' : ''}`}
+                  onClick={() => toggleShip(s.code)}
+                  type="button"
+                >
+                  {shipShortName(s.name)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {suiteSelected && suiteSubcategoryOptions.length > 0 && (
           <div className="cc-subfilter-row">

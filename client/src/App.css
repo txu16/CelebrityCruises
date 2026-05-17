@@ -127,9 +127,10 @@ select { font: inherit; color: inherit; }
 }
 .cc-filter-row {
   display: grid;
-  grid-template-columns: 180px 1fr 180px 200px auto;
+  grid-template-columns: 1fr auto auto;
   align-items: end;
   gap: 18px;
+  margin-bottom: 14px;
 }
 .cc-field-label {
   font-size: 10px;
@@ -230,6 +231,50 @@ select { font: inherit; color: inherit; }
 .cc-sort-opt.is-on {
   background: var(--cc-ink);
   color: #fff;
+}
+
+/* Filter sections (month, ship chip scrolls) */
+.cc-filter-section {
+  margin-bottom: 14px;
+}
+.cc-filter-section-label {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cc-ink-soft);
+  margin-bottom: 6px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cc-filter-clear-inline {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--cc-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+.cc-chip-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.cc-chip-scroll::-webkit-scrollbar { height: 4px; }
+.cc-chip-scroll::-webkit-scrollbar-track { background: transparent; }
+.cc-chip-scroll::-webkit-scrollbar-thumb { background: var(--cc-line); border-radius: 2px; }
+.cc-chip-sm {
+  height: 32px;
+  padding: 0 11px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Sub-filter row */
@@ -705,8 +750,8 @@ select { font: inherit; color: inherit; }
 }
 
 @media (max-width: 1100px) {
-  .cc-filter-row { grid-template-columns: 1fr 1fr; gap: 14px; }
-  .cc-field-grow { grid-column: span 2; }
+  .cc-filter-row { grid-template-columns: 1fr auto; gap: 14px; }
+  .cc-field-grow { grid-column: span 1; }
   .cc-d-hero { grid-template-columns: 1fr; }
   .cc-d-itin-grid { grid-template-columns: 1fr; }
   .cc-d-ship { grid-template-columns: 1fr; }
@@ -719,8 +764,7 @@ select { font: inherit; color: inherit; }
   .cc-tabs { grid-column: 1 / -1; justify-self: stretch; }
   .cc-tab { flex: 1; text-align: center; }
   .cc-filter-inner { padding: 14px 16px; }
-  .cc-filter-row { grid-template-columns: 1fr; gap: 12px; }
-  .cc-field-grow { grid-column: span 1; }
+  .cc-filter-row { grid-template-columns: 1fr; gap: 12px; flex-wrap: wrap; }
   .cc-main { padding: 18px 16px 60px; }
   .cc-card-prices { grid-template-columns: repeat(2, 1fr); }
   .cc-table-wrap { overflow-x: auto; }

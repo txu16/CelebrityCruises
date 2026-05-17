@@ -10,11 +10,11 @@ import { SavedSearchesPopover, loadSavedCount } from './components/SavedSearches
 import './App.css';
 
 const DEFAULT_FILTERS: Filters = {
-  month: '',
+  months: [],
   cabinCategories: [],
   suiteSubcategories: [],
-  nightsPreset: 'any',
-  shipCode: '',
+  nightsPresets: [],
+  shipCodes: [],
   sortBy: 'date',
 };
 

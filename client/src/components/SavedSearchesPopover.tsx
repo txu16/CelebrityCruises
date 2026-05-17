@@ -24,10 +24,16 @@ export function loadSavedCount(): number {
 
 function summarize(f: Filters): string {
   const parts: string[] = [];
-  if (f.month) parts.push(new Date(f.month + '-01T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+  if (f.months.length === 1) {
+    parts.push(new Date(f.months[0] + '-01T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+  } else if (f.months.length > 1) {
+    parts.push(`${f.months.length} months`);
+  }
   if (f.cabinCategories.length) parts.push(f.cabinCategories.map((c) => c[0].toUpperCase() + c.slice(1)).join(' + '));
-  if (f.nightsPreset !== 'any') parts.push(f.nightsPreset + ' nights');
-  if (f.shipCode) parts.push(f.shipCode);
+  if (f.nightsPresets.length === 1) parts.push(f.nightsPresets[0] + ' nights');
+  else if (f.nightsPresets.length > 1) parts.push(`${f.nightsPresets.length} lengths`);
+  if (f.shipCodes.length === 1) parts.push(f.shipCodes[0]);
+  else if (f.shipCodes.length > 1) parts.push(`${f.shipCodes.length} ships`);
   return parts.length ? parts.join(' · ') : 'All sailings';
 }
 
@@ -53,7 +59,7 @@ export function SavedSearchesPopover({ filters, onClose, onApply, onCountChange 
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onEsc); };
   }, [onClose]);
 
-  const canSave = filters.cabinCategories.length > 0 || !!filters.month || filters.nightsPreset !== 'any' || !!filters.shipCode;
+  const canSave = filters.cabinCategories.length > 0 || filters.months.length > 0 || filters.nightsPresets.length > 0 || filters.shipCodes.length > 0;
 
   const save = () => {
     const label = name.trim() || summarize(filters);
