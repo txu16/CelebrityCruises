@@ -5,6 +5,7 @@ import type { Filters, Sailing } from '../types';
 export function useSailings(filters: Filters) {
   const [sailings, setSailings] = useState<Sailing[]>([]);
   const [total, setTotal] = useState(0);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -18,6 +19,7 @@ export function useSailings(filters: Filters) {
         const data = await fetchSailings(filters);
         setSailings(data.sailings);
         setTotal(data.total);
+        setLastSynced(data.lastSynced ?? null);
       } catch (e) {
         setError(String(e));
       } finally {
@@ -28,5 +30,5 @@ export function useSailings(filters: Filters) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filters)]);
 
-  return { sailings, total, loading, error };
+  return { sailings, total, lastSynced, loading, error };
 }

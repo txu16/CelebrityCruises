@@ -44,7 +44,7 @@ export default function App() {
     fetchShips().then(setShips).catch(console.error);
   }, []);
 
-  const { sailings: browseSailings, total } = useSailings(filters);
+  const { sailings: browseSailings, total, lastSynced } = useSailings(filters);
   const suiteSubcategoryOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of browseSailings) {
@@ -138,6 +138,7 @@ export default function App() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         resultCount={total}
+        lastSynced={lastSynced}
       />
 
       <main className="cc-main">

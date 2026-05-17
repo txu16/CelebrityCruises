@@ -86,16 +86,20 @@ router.get('/', async (req: Request, res: Response) => {
     if (sailErr) { res.status(500).json({ error: sailErr.message }); return; }
     if (!sailingRows?.length) { res.json({ sailings: [], total: count ?? 0 }); return; }
 
-    // Step 2: fetch current prices for just these sailings (max ~500 IDs at a time)
+    // Step 2: fetch current prices + last sync time in parallel
     const sailingIds = (sailingRows as { id: string }[]).map((s) => s.id);
     let priceQ = supabase
       .from('current_prices')
-      .select('sailing_id, cabin_category, current_price')
+      .select('sailing_id, cabin_category, current_price, last_updated')
       .in('sailing_id', sailingIds);
     if (selectedCats) priceQ = priceQ.in('cabin_category', selectedCats);
 
-    const { data: priceRows, error: priceErr } = await priceQ;
+    const [{ data: priceRows, error: priceErr }, { data: syncData }] = await Promise.all([
+      priceQ,
+      supabase.from('current_prices').select('last_updated').order('last_updated', { ascending: false }).limit(1),
+    ]);
     if (priceErr) { res.status(500).json({ error: priceErr.message }); return; }
+    const lastSynced = (syncData as { last_updated: string }[] | null)?.[0]?.last_updated ?? null;
 
     // Step 3: build per-sailing price map (cheapest per category)
     const priceMap = new Map<string, Map<string, number>>();
@@ -145,7 +149,7 @@ router.get('/', async (req: Request, res: Response) => {
       results = results.slice(parsedOffset, parsedOffset + parsedLimit);
     }
 
-    res.json({ sailings: results, total: count ?? results.length });
+    res.json({ sailings: results, total: count ?? results.length, lastSynced });
   } catch (e) {
     console.error('[/api/sailings]', e);
     res.status(500).json({ error: String(e) });

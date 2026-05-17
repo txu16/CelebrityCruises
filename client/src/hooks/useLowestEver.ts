@@ -5,6 +5,7 @@ import type { Filters, Sailing } from '../types';
 export function useLowestEver(filters: Filters) {
   const [sailings, setSailings] = useState<Sailing[]>([]);
   const [total, setTotal] = useState(0);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requiresCabinFilter, setRequiresCabinFilter] = useState(false);
@@ -19,6 +20,7 @@ export function useLowestEver(filters: Filters) {
         const data = await fetchLowestEver(filters);
         setSailings(data.sailings);
         setTotal(data.total);
+        setLastSynced(data.lastSynced ?? null);
         setRequiresCabinFilter(data.requiresCabinFilter);
       } catch (e) {
         setError(String(e));
@@ -30,5 +32,5 @@ export function useLowestEver(filters: Filters) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filters)]);
 
-  return { sailings, total, loading, error, requiresCabinFilter };
+  return { sailings, total, lastSynced, loading, error, requiresCabinFilter };
 }

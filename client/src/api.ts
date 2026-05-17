@@ -11,18 +11,18 @@ function filtersToParams(filters: Filters): URLSearchParams {
   return params;
 }
 
-export async function fetchSailings(filters: Filters): Promise<{ sailings: Sailing[]; total: number }> {
+export async function fetchSailings(filters: Filters): Promise<{ sailings: Sailing[]; total: number; lastSynced: string | null }> {
   const params = filtersToParams(filters);
   const res = await fetch(`/api/sailings?${params}`);
   if (!res.ok) throw new Error(`fetchSailings: ${res.status}`);
-  return res.json() as Promise<{ sailings: Sailing[]; total: number }>;
+  return res.json() as Promise<{ sailings: Sailing[]; total: number; lastSynced: string | null }>;
 }
 
-export async function fetchLowestEver(filters: Filters): Promise<{ sailings: Sailing[]; total: number; requiresCabinFilter: boolean }> {
+export async function fetchLowestEver(filters: Filters): Promise<{ sailings: Sailing[]; total: number; requiresCabinFilter: boolean; lastSynced: string | null }> {
   const params = filtersToParams(filters);
   const res = await fetch(`/api/lowest-ever?${params}`);
   if (!res.ok) throw new Error(`fetchLowestEver: ${res.status}`);
-  return res.json() as Promise<{ sailings: Sailing[]; total: number; requiresCabinFilter: boolean }>;
+  return res.json() as Promise<{ sailings: Sailing[]; total: number; requiresCabinFilter: boolean; lastSynced: string | null }>;
 }
 
 export async function fetchPriceHistory(id: string): Promise<Record<string, PriceHistoryPoint[]>> {

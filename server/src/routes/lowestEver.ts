@@ -82,8 +82,8 @@ router.get('/', async (req: Request, res: Response) => {
 
     const sailingIds = (sailingRows as { id: string }[]).map((s) => s.id);
 
-    // Step 2: fetch current and lowest-ever prices for these sailings in parallel
-    const [{ data: priceRows, error: priceErr }, { data: lowestRows, error: lowestErr }] =
+    // Step 2: fetch current prices, lowest-ever prices, and last sync time in parallel
+    const [{ data: priceRows, error: priceErr }, { data: lowestRows, error: lowestErr }, { data: syncData }] =
       await Promise.all([
         supabase
           .from('current_prices')
@@ -95,7 +95,9 @@ router.get('/', async (req: Request, res: Response) => {
           .select('sailing_id, cabin_category, lowest_ever_price, first_tracked_at')
           .in('sailing_id', sailingIds)
           .in('cabin_category', selectedCats),
+        supabase.from('current_prices').select('last_updated').order('last_updated', { ascending: false }).limit(1),
       ]);
+    const lastSynced = (syncData as { last_updated: string }[] | null)?.[0]?.last_updated ?? null;
 
     if (priceErr)  { res.status(500).json({ error: priceErr.message }); return; }
     if (lowestErr) { res.status(500).json({ error: lowestErr.message }); return; }
@@ -168,6 +170,7 @@ router.get('/', async (req: Request, res: Response) => {
     res.json({
       sailings: results.slice(parsedOffset, parsedOffset + parsedLimit),
       total,
+      lastSynced,
       requiresCabinFilter: false,
     });
   } catch (e) {

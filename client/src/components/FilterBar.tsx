@@ -10,6 +10,7 @@ interface Props {
   viewMode: 'cards' | 'table';
   onViewModeChange: (v: 'cards' | 'table') => void;
   resultCount: number;
+  lastSynced?: string | null;
 }
 
 function getMonthOptions(): { value: string; label: string; short: string }[] {
@@ -74,9 +75,15 @@ function summarizeFilters(filters: Filters, ships: Ship[]): string {
   return parts.length ? parts.join(' · ') : 'All sailings · sorted by departure';
 }
 
+function fmtSyncTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+}
+
 export function FilterBar({
   filters, ships, suiteSubcategoryOptions, onChange,
-  collapsed, onToggleCollapsed, viewMode, onViewModeChange, resultCount,
+  collapsed, onToggleCollapsed, viewMode, onViewModeChange, resultCount, lastSynced,
 }: Props) {
   function toggleMonth(val: string) {
     const next = filters.months.includes(val)
@@ -313,6 +320,14 @@ export function FilterBar({
           <span className="cc-result-count">{resultCount.toLocaleString()} sailings</span>
           <span className="cc-result-sep">·</span>
           <span className="cc-result-fine">Prices per person, double occupancy, taxes &amp; fees included</span>
+          {lastSynced && (
+            <>
+              <span className="cc-result-sep">·</span>
+              <span className="cc-result-fine" title="Prices are synced daily at 2am UTC from Celebrity's website">
+                Prices as of {fmtSyncTime(lastSynced)}
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
