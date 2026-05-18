@@ -1,26 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Filters } from '../types';
-
-const STORE_KEY = 'cc-saved-searches-v1';
-
-interface SavedEntry {
-  id: string;
-  label: string;
-  filters: Filters;
-  createdAt: number;
-}
-
-function loadSaved(): SavedEntry[] {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? '[]') as SavedEntry[]; }
-  catch { return []; }
-}
-function persistSaved(list: SavedEntry[]) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch {}
-}
-
-export function loadSavedCount(): number {
-  return loadSaved().length;
-}
+import { loadSaved, persistSaved, type SavedEntry } from '../savedSearchStorage';
 
 function summarize(f: Filters): string {
   const parts: string[] = [];
