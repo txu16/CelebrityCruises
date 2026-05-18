@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
 import {
   buildSailingResults,
+  buildCurrentRowsFromSnapshots,
   fetchAllRows,
   fetchRowsForIdChunks,
   filterLowestEverResults,
@@ -11,18 +12,11 @@ import {
   sortResults,
   type RawLowestRow,
   type RawPriceRow,
+  type RawPriceSnapshotRow,
   type RawSailingRow,
 } from './sailingResults';
 
 const router = Router();
-
-interface PriceSnapshotRow {
-  sailing_id: string;
-  cabin_category: string;
-  cabin_subcategory: string | null;
-  price_per_person: number;
-  captured_at: string;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyBaseFilters(q: any, { months, nightsPresets, shipCodes, today }: {
@@ -100,16 +94,8 @@ router.get('/', async (req: Request, res: Response) => {
 
     const [priceRows, snapshotRows, { data: syncData }] =
       await Promise.all([
-        fetchRowsForIdChunks<RawPriceRow>(sailingIds, (ids) => {
-          let priceQ = supabase
-            .from('current_prices')
-            .select('sailing_id, cabin_category, cabin_subcategory, cabin_subcategory_name, current_price')
-            .in('sailing_id', ids)
-            .in('cabin_category', selectedCats);
-          if (suiteSubcategories.length > 0) priceQ = priceQ.in('cabin_subcategory', suiteSubcategories);
-          return priceQ;
-        }),
-        fetchRowsForIdChunks<PriceSnapshotRow>(sailingIds, (ids) => {
+        fetchCurrentPriceRows(sailingIds, selectedCats, suiteSubcategories),
+        fetchRowsForIdChunks<RawPriceSnapshotRow>(sailingIds, (ids) => {
           let snapshotQ = supabase
             .from('price_snapshots')
             .select('sailing_id, cabin_category, cabin_subcategory, price_per_person, captured_at')
@@ -152,7 +138,31 @@ router.get('/', async (req: Request, res: Response) => {
 
 export default router;
 
-function buildLowestRows(rows: PriceSnapshotRow[], includeSuiteSubcategory: boolean): RawLowestRow[] {
+function fetchCurrentPriceRows(
+  sailingIds: string[],
+  selectedCats: string[],
+  suiteSubcategories: string[]
+): Promise<RawPriceRow[]> {
+  if (suiteSubcategories.length > 0) {
+    return fetchRowsForIdChunks<RawPriceSnapshotRow>(sailingIds, (ids) => {
+      let snapshotQ = supabase
+        .from('price_snapshots')
+        .select('sailing_id, cabin_category, cabin_subcategory, cabin_subcategory_name, price_per_person, captured_at')
+        .in('sailing_id', ids)
+        .in('cabin_category', selectedCats);
+      snapshotQ = snapshotQ.in('cabin_subcategory', suiteSubcategories);
+      return snapshotQ;
+    }).then(buildCurrentRowsFromSnapshots);
+  }
+
+  return fetchRowsForIdChunks<RawPriceRow>(sailingIds, (ids) => supabase
+    .from('current_prices')
+    .select('sailing_id, cabin_category, current_price')
+    .in('sailing_id', ids)
+    .in('cabin_category', selectedCats));
+}
+
+function buildLowestRows(rows: RawPriceSnapshotRow[], includeSuiteSubcategory: boolean): RawLowestRow[] {
   const lowest = new Map<string, RawLowestRow>();
 
   for (const row of rows) {

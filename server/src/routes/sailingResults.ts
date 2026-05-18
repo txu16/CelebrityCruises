@@ -17,9 +17,18 @@ export interface RawSailingRow {
 export interface RawPriceRow {
   sailing_id: string;
   cabin_category: string;
-  cabin_subcategory: string | null;
-  cabin_subcategory_name: string | null;
+  cabin_subcategory?: string | null;
+  cabin_subcategory_name?: string | null;
   current_price: number;
+}
+
+export interface RawPriceSnapshotRow {
+  sailing_id: string;
+  cabin_category: string;
+  cabin_subcategory: string | null;
+  cabin_subcategory_name?: string | null;
+  price_per_person: number;
+  captured_at: string;
 }
 
 export interface RawLowestRow {
@@ -100,6 +109,26 @@ export async function fetchRowsForIdChunks<T>(
   }
 
   return rows;
+}
+
+export function buildCurrentRowsFromSnapshots(rows: RawPriceSnapshotRow[]): RawPriceRow[] {
+  const latestByKey = new Map<string, RawPriceSnapshotRow>();
+
+  for (const row of rows) {
+    const key = [row.sailing_id, row.cabin_category, row.cabin_subcategory ?? ''].join('|');
+    const existing = latestByKey.get(key);
+    if (!existing || row.captured_at > existing.captured_at) {
+      latestByKey.set(key, row);
+    }
+  }
+
+  return Array.from(latestByKey.values()).map((row) => ({
+    sailing_id: row.sailing_id,
+    cabin_category: row.cabin_category,
+    cabin_subcategory: row.cabin_subcategory,
+    cabin_subcategory_name: row.cabin_subcategory_name ?? row.cabin_subcategory,
+    current_price: row.price_per_person,
+  }));
 }
 
 export function buildSailingResults({
