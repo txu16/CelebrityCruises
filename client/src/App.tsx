@@ -6,7 +6,8 @@ import { FilterBar } from './components/FilterBar';
 import { BrowseView } from './components/BrowseView';
 import { LowestEverView } from './components/LowestEverView';
 import { SailingDetail } from './components/SailingDetail';
-import { SavedSearchesPopover, loadSavedCount } from './components/SavedSearchesPopover';
+import { SavedSearchesPopover } from './components/SavedSearchesPopover';
+import { loadSavedCount } from './savedSearchStorage';
 import './App.css';
 
 const DEFAULT_FILTERS: Filters = {

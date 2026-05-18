@@ -2,8 +2,11 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { runFullSync } from '../lib/priceSync';
 import { fetchShips, fetchAllSailingsWithPrices } from '../lib/celebrityApi';
+import { expressAdminAuth } from './adminAuth';
 
 const router = Router();
+
+router.use(expressAdminAuth);
 
 // Manual full sync trigger
 router.post('/', async (_req: Request, res: Response) => {

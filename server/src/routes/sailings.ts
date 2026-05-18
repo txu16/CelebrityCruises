@@ -1,9 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
+import {
+  buildSailingResults,
+  fetchAllRows,
+  fetchRowsForIdChunks,
+  paginateResults,
+  parseList,
+  parsePagination,
+  sortResults,
+  type RawPriceRow,
+  type RawSailingRow,
+} from './sailingResults';
 
 const router = Router();
-
-const ALL_CATS = ['interior', 'oceanview', 'balcony', 'suite'] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyBaseFilters(q: any, { months, nightsPresets, shipCodes, today }: {
@@ -47,109 +56,61 @@ router.get('/', async (req: Request, res: Response) => {
   try {
     const {
       months: monthsParam, cabinCategory, nightsPresets: nightsPresetsParam,
-      shipCodes: shipCodesParam, sortBy,
+      shipCodes: shipCodesParam, suiteSubcategory, sortBy,
       limit = '50', offset = '0',
     } = req.query as Record<string, string>;
 
     const today = new Date().toISOString().split('T')[0];
-    const parsedLimit = Math.min(Number(limit) || 50, 200);
-    const parsedOffset = Number(offset) || 0;
-    const selectedCats = cabinCategory
-      ? cabinCategory.split(',').map((c) => c.trim()).filter(Boolean)
-      : null;
-    const months = monthsParam ? monthsParam.split(',').map((m) => m.trim()).filter(Boolean) : [];
-    const nightsPresets = nightsPresetsParam ? nightsPresetsParam.split(',').map((n) => n.trim()).filter(Boolean) : [];
-    const shipCodes = shipCodesParam ? shipCodesParam.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const { limit: parsedLimit, offset: parsedOffset } = parsePagination(limit, offset);
+    const selectedCats = parseList(cabinCategory);
+    const suiteSubcategories = parseList(suiteSubcategory);
+    const months = parseList(monthsParam);
+    const nightsPresets = parseList(nightsPresetsParam);
+    const shipCodes = parseList(shipCodesParam);
     const filterArgs = { months, nightsPresets, shipCodes, today };
 
-    // For price sort, fetch a large batch and sort in JS; for date sort paginate at DB
-    const sortByPrice = sortBy === 'price';
-    const dbLimit  = sortByPrice ? 500 : parsedLimit;
-    const dbOffset = sortByPrice ? 0   : parsedOffset;
-
-    // Step 1a: total count (non-cabin filters only)
-    const { count, error: countErr } = await applyBaseFilters(
-      supabase.from('sailings').select('id', { count: 'exact', head: true }),
-      filterArgs
-    );
-    if (countErr) { res.status(500).json({ error: countErr.message }); return; }
-
-    // Step 1b: fetch the page of sailings ordered by date
-    const { data: sailingRows, error: sailErr } = await applyBaseFilters(
+    // Fetch the full filtered sailing set first. Price and cabin filters are applied
+    // after joining current prices so totals and pagination match what users see.
+    const sailingRows = await fetchAllRows<RawSailingRow>(() => applyBaseFilters(
       supabase
         .from('sailings')
         .select('id, ship_code, ship_name, departure_date, return_date, nights, destination, embarkation_port, itinerary_ports')
-        .order('departure_date', { ascending: true })
-        .range(dbOffset, dbOffset + dbLimit - 1),
+        .order('departure_date', { ascending: true }),
       filterArgs
-    );
-    if (sailErr) { res.status(500).json({ error: sailErr.message }); return; }
-    if (!sailingRows?.length) { res.json({ sailings: [], total: count ?? 0 }); return; }
+    ));
+    if (!sailingRows.length) { res.json({ sailings: [], total: 0 }); return; }
 
-    // Step 2: fetch current prices + last sync time in parallel
-    const sailingIds = (sailingRows as { id: string }[]).map((s) => s.id);
-    let priceQ = supabase
-      .from('current_prices')
-      .select('sailing_id, cabin_category, current_price, last_updated')
-      .in('sailing_id', sailingIds);
-    if (selectedCats) priceQ = priceQ.in('cabin_category', selectedCats);
-
-    const [{ data: priceRows, error: priceErr }, { data: syncData }] = await Promise.all([
-      priceQ,
+    const sailingIds = sailingRows.map((s) => s.id);
+    const [priceRows, { data: syncData }] = await Promise.all([
+      fetchRowsForIdChunks<RawPriceRow>(sailingIds, (ids) => {
+        let priceQ = supabase
+          .from('current_prices')
+          .select('sailing_id, cabin_category, cabin_subcategory, cabin_subcategory_name, current_price, last_updated')
+          .in('sailing_id', ids);
+        if (selectedCats.length > 0) priceQ = priceQ.in('cabin_category', selectedCats);
+        if (suiteSubcategories.length > 0) priceQ = priceQ.in('cabin_subcategory', suiteSubcategories);
+        return priceQ;
+      }),
       supabase.from('current_prices').select('last_updated').order('last_updated', { ascending: false }).limit(1),
     ]);
-    if (priceErr) { res.status(500).json({ error: priceErr.message }); return; }
     const lastSynced = (syncData as { last_updated: string }[] | null)?.[0]?.last_updated ?? null;
 
-    // Step 3: build per-sailing price map (cheapest per category)
-    const priceMap = new Map<string, Map<string, number>>();
-    for (const p of (priceRows ?? []) as { sailing_id: string; cabin_category: string; current_price: number }[]) {
-      if (!priceMap.has(p.sailing_id)) priceMap.set(p.sailing_id, new Map());
-      const catMap = priceMap.get(p.sailing_id)!;
-      const prev = catMap.get(p.cabin_category);
-      if (prev === undefined || p.current_price < prev) catMap.set(p.cabin_category, p.current_price);
-    }
+    const results = sortResults(
+      buildSailingResults({
+        sailingRows,
+        priceRows,
+        selectedCats,
+        suiteSubcategories,
+      }),
+      sortBy,
+      selectedCats
+    );
 
-    // Step 4: build result objects, filter by cabin presence if category filter set
-    let results = (sailingRows as {
-      id: string; ship_code: string; ship_name: string;
-      departure_date: string; return_date: string; nights: number;
-      destination: string; embarkation_port: string; itinerary_ports: string[] | null;
-    }[])
-      .filter((s) => {
-        if (!selectedCats) return true;
-        const cats = priceMap.get(s.id);
-        return cats !== undefined && selectedCats.some((c) => cats.has(c));
-      })
-      .map((s) => {
-        const cats = priceMap.get(s.id) ?? new Map<string, number>();
-        return {
-          id:              s.id,
-          shipCode:        s.ship_code,
-          shipName:        s.ship_name,
-          departureDate:   s.departure_date,
-          returnDate:      s.return_date,
-          nights:          s.nights,
-          destination:     s.destination,
-          embarkationPort: s.embarkation_port,
-          itineraryPorts:  s.itinerary_ports ?? [],
-          prices: Object.fromEntries(
-            ALL_CATS.map((cat) => [cat, { current: cats.get(cat) ?? null }])
-          ),
-        };
-      });
-
-    // Step 5: sort by price if requested, then JS-paginate
-    if (sortByPrice) {
-      results.sort((a, b) => {
-        const minPrice = (r: typeof results[0]) =>
-          Math.min(...ALL_CATS.map((c) => (r.prices as Record<string, { current: number | null }>)[c]?.current ?? Infinity));
-        return minPrice(a) - minPrice(b);
-      });
-      results = results.slice(parsedOffset, parsedOffset + parsedLimit);
-    }
-
-    res.json({ sailings: results, total: count ?? results.length, lastSynced });
+    res.json({
+      sailings: paginateResults(results, parsedOffset, parsedLimit),
+      total: results.length,
+      lastSynced,
+    });
   } catch (e) {
     console.error('[/api/sailings]', e);
     res.status(500).json({ error: String(e) });
