@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabase } from '../lib/supabase';
 import {
   buildSailingResults,
+  buildCurrentRowsFromSnapshots,
   fetchAllRows,
   fetchRowsForIdChunks,
   paginateResults,
@@ -9,6 +10,7 @@ import {
   parsePagination,
   sortResults,
   type RawPriceRow,
+  type RawPriceSnapshotRow,
   type RawSailingRow,
 } from './sailingResults';
 
@@ -82,15 +84,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const sailingIds = sailingRows.map((s) => s.id);
     const [priceRows, { data: syncData }] = await Promise.all([
-      fetchRowsForIdChunks<RawPriceRow>(sailingIds, (ids) => {
-        let priceQ = supabase
-          .from('current_prices')
-          .select('sailing_id, cabin_category, cabin_subcategory, cabin_subcategory_name, current_price, last_updated')
-          .in('sailing_id', ids);
-        if (selectedCats.length > 0) priceQ = priceQ.in('cabin_category', selectedCats);
-        if (suiteSubcategories.length > 0) priceQ = priceQ.in('cabin_subcategory', suiteSubcategories);
-        return priceQ;
-      }),
+      fetchCurrentPriceRows(sailingIds, selectedCats, suiteSubcategories),
       supabase.from('current_prices').select('last_updated').order('last_updated', { ascending: false }).limit(1),
     ]);
     const lastSynced = (syncData as { last_updated: string }[] | null)?.[0]?.last_updated ?? null;
@@ -137,3 +131,30 @@ router.get('/:id/history', async (req: Request, res: Response) => {
 });
 
 export default router;
+
+function fetchCurrentPriceRows(
+  sailingIds: string[],
+  selectedCats: string[],
+  suiteSubcategories: string[]
+): Promise<RawPriceRow[]> {
+  if (suiteSubcategories.length > 0) {
+    return fetchRowsForIdChunks<RawPriceSnapshotRow>(sailingIds, (ids) => {
+      let snapshotQ = supabase
+        .from('price_snapshots')
+        .select('sailing_id, cabin_category, cabin_subcategory, cabin_subcategory_name, price_per_person, captured_at')
+        .in('sailing_id', ids)
+        .in('cabin_category', selectedCats.length > 0 ? selectedCats : ['suite']);
+      snapshotQ = snapshotQ.in('cabin_subcategory', suiteSubcategories);
+      return snapshotQ;
+    }).then(buildCurrentRowsFromSnapshots);
+  }
+
+  return fetchRowsForIdChunks<RawPriceRow>(sailingIds, (ids) => {
+    let priceQ = supabase
+      .from('current_prices')
+      .select('sailing_id, cabin_category, current_price, last_updated')
+      .in('sailing_id', ids);
+    if (selectedCats.length > 0) priceQ = priceQ.in('cabin_category', selectedCats);
+    return priceQ;
+  });
+}

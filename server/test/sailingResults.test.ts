@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   buildSailingResults,
+  buildCurrentRowsFromSnapshots,
   fetchAllRows,
   fetchRowsForIdChunks,
   filterLowestEverResults,
@@ -136,5 +137,18 @@ describe('sailing result helpers', () => {
 
     assert.deepEqual(seenChunks, [['a', 'b'], ['c', 'd'], ['e']]);
     assert.deepEqual(rows.map((row) => row.id), ['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('builds subtype-aware current rows from the latest snapshots', () => {
+    const rows = buildCurrentRowsFromSnapshots([
+      { sailing_id: 'a', cabin_category: 'suite', cabin_subcategory: 'RS', cabin_subcategory_name: 'Royal Suite', price_per_person: 9000, captured_at: '2026-01-01T00:00:00Z' },
+      { sailing_id: 'a', cabin_category: 'suite', cabin_subcategory: 'RS', cabin_subcategory_name: 'Royal Suite', price_per_person: 8000, captured_at: '2026-01-02T00:00:00Z' },
+      { sailing_id: 'a', cabin_category: 'suite', cabin_subcategory: 'S1', cabin_subcategory_name: 'Sky Suite', price_per_person: 3000, captured_at: '2026-01-02T00:00:00Z' },
+    ]);
+
+    assert.deepEqual(rows, [
+      { sailing_id: 'a', cabin_category: 'suite', cabin_subcategory: 'RS', cabin_subcategory_name: 'Royal Suite', current_price: 8000 },
+      { sailing_id: 'a', cabin_category: 'suite', cabin_subcategory: 'S1', cabin_subcategory_name: 'Sky Suite', current_price: 3000 },
+    ]);
   });
 });
