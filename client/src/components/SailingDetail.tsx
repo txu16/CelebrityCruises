@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchPriceHistory } from '../api';
 import type { PriceHistoryPoint, Sailing } from '../types';
 
@@ -40,9 +40,13 @@ function fmtDateLong(d: string) {
 }
 
 function PriceHistoryChart({ points, cabin }: { points: PriceHistoryPoint[]; cabin: CabinKey }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
   if (points.length < 2) {
     return <div className="cc-d-empty-cell">Not enough history yet — check back after the next sync.</div>;
   }
+
   const W = 720, H = 180, PAD = 12;
   const vals = points.map((p) => p.price);
   const min = Math.min(...vals), max = Math.max(...vals);
@@ -55,10 +59,32 @@ function PriceHistoryChart({ points, cabin }: { points: PriceHistoryPoint[]; cab
   const dates = points.map((p) => new Date(p.date));
   const fmtAxisDate = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+  function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const svgX = ((e.clientX - rect.left) / rect.width) * W;
+    const raw = (svgX - PAD) / (W - PAD * 2) * (points.length - 1);
+    setHoveredIdx(Math.max(0, Math.min(points.length - 1, Math.round(raw))));
+  }
+
   void cabin;
+
+  const hovPt = hoveredIdx !== null ? points[hoveredIdx] : null;
+  const hovX  = hoveredIdx !== null ? x(hoveredIdx) : null;
+  const hovY  = hoveredIdx !== null ? y(points[hoveredIdx].price) : null;
+  // tooltip alignment: flip left if near right edge
+  const tooltipPct = hovX !== null ? (hovX / W) * 100 : null;
+  const tooltipAlign = tooltipPct !== null && tooltipPct > 72 ? 'right' : tooltipPct !== null && tooltipPct < 28 ? 'left' : 'center';
+
   return (
     <div className="cc-d-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="cc-d-chart-svg">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="cc-d-chart-svg cc-d-chart-interactive"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
         <defs>
           <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--cc-accent)" stopOpacity="0.22" />
@@ -72,10 +98,43 @@ function PriceHistoryChart({ points, cabin }: { points: PriceHistoryPoint[]; cab
         ))}
         <path d={area} fill="url(#chartFill)" />
         <path d={path} fill="none" stroke="var(--cc-accent)" strokeWidth="1.6" />
-        <circle cx={x(minIdx)} cy={y(min)} r="4" fill="var(--cc-gold)" stroke="var(--cc-surface)" strokeWidth="2" />
-        <circle cx={x(maxIdx)} cy={y(max)} r="3" fill="var(--cc-ink-soft)" stroke="var(--cc-surface)" strokeWidth="2" />
-        <circle cx={x(points.length - 1)} cy={y(vals[vals.length - 1])} r="4" fill="var(--cc-accent)" stroke="var(--cc-surface)" strokeWidth="2" />
+
+        {/* Hover crosshair */}
+        {hoveredIdx !== null && hovX !== null && hovY !== null && (
+          <>
+            <line
+              x1={hovX} x2={hovX} y1={PAD} y2={H - PAD}
+              stroke="var(--cc-accent)" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
+            />
+            <circle cx={hovX} cy={hovY} r="5" fill="var(--cc-accent)" stroke="var(--cc-surface)" strokeWidth="2" />
+          </>
+        )}
+
+        {/* Permanent markers — only show when not hovering over them */}
+        {hoveredIdx !== minIdx && (
+          <circle cx={x(minIdx)} cy={y(min)} r="4" fill="var(--cc-gold)" stroke="var(--cc-surface)" strokeWidth="2" />
+        )}
+        {hoveredIdx !== maxIdx && (
+          <circle cx={x(maxIdx)} cy={y(max)} r="3" fill="var(--cc-ink-soft)" stroke="var(--cc-surface)" strokeWidth="2" />
+        )}
+        {hoveredIdx !== points.length - 1 && (
+          <circle cx={x(points.length - 1)} cy={y(vals[vals.length - 1])} r="4" fill="var(--cc-accent)" stroke="var(--cc-surface)" strokeWidth="2" />
+        )}
       </svg>
+
+      {/* Hover tooltip */}
+      {hovPt !== null && tooltipPct !== null && (
+        <div
+          className={`cc-d-chart-tip cc-d-chart-tip-${tooltipAlign}`}
+          style={{ left: `${tooltipPct}%` }}
+        >
+          <div className="cc-d-chart-tip-price">{fmtMoney(hovPt.price)}</div>
+          <div className="cc-d-chart-tip-date">
+            {new Date(hovPt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </div>
+        </div>
+      )}
+
       <div className="cc-d-chart-axis">
         <span>{fmtAxisDate(dates[0])}</span>
         <span>{fmtAxisDate(dates[Math.floor(dates.length * 0.33)])}</span>
