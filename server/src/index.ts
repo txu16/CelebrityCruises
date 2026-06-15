@@ -5,7 +5,6 @@ import path from 'path';
 
 import { checkConnection } from './lib/supabase';
 import { runFullSync } from './lib/priceSync';
-import { startDailySync } from './cron/dailySync';
 
 import sailingsRouter  from './routes/sailings';
 import lowestEverRouter from './routes/lowestEver';
@@ -41,8 +40,6 @@ app.listen(PORT, async () => {
 
   const dbOk = await checkConnection();
   console.log(`[server] Supabase: ${dbOk ? 'connected' : 'NOT connected (check env vars)'}`);
-
-  startDailySync();
 
   if (process.env.SYNC_ON_STARTUP === 'true') {
     console.log('[server] SYNC_ON_STARTUP=true — running initial sync...');
