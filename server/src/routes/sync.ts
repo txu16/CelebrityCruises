@@ -8,15 +8,11 @@ const router = Router();
 
 router.use(expressAdminAuth);
 
-// Manual full sync trigger
-router.post('/', async (_req: Request, res: Response) => {
-  try {
-    const result = await runFullSync();
-    res.json(result);
-  } catch (e) {
-    console.error('[/api/sync]', e);
-    res.status(500).json({ error: String(e) });
-  }
+// Manual full sync trigger — responds immediately, runs sync in background
+// (sync takes 2-5 min; Railway's proxy timeout would cut it off if we awaited)
+router.post('/', (_req: Request, res: Response) => {
+  res.json({ ok: true, message: 'Sync started' });
+  runFullSync().catch((e) => console.error('[/api/sync] background sync failed:', e));
 });
 
 // Debug route: test API connectivity and return first 5 sailings with prices
